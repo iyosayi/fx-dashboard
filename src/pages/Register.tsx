@@ -7,11 +7,11 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
-const Login = () => {
+const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -19,11 +19,11 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      await login(email, password);
-      toast.success('Welcome back!');
+      await register(email, password);
+      toast.success('Account created successfully!');
       navigate('/dashboard');
     } catch (error) {
-      // Error is already handled by the useLogin hook
+      // Error is already handled by the useRegister hook
     } finally {
       setIsLoading(false);
     }
@@ -69,13 +69,13 @@ const Login = () => {
         </div>
       </div>
 
-      {/* Right Side - Login Form */}
+      {/* Right Side - Register Form */}
       <div className="flex-1 flex items-center justify-center px-8 py-12">
         <div className="w-full max-w-md">
           <div className="glass-card p-8 animate-slide-up">
             <div className="mb-8">
-              <h2 className="text-3xl font-bold mb-2">Welcome back</h2>
-              <p className="text-muted-foreground">Sign in to your account to continue</p>
+              <h2 className="text-3xl font-bold mb-2">Create an account</h2>
+              <p className="text-muted-foreground">Sign up to start managing your conversions</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -97,7 +97,7 @@ const Login = () => {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Enter your password"
+                  placeholder="Create a password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -113,11 +113,11 @@ const Login = () => {
                 {isLoading ? (
                   <span className="flex items-center gap-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Signing in...
+                    Creating account...
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">
-                    Sign In
+                    Sign Up
                     <ArrowRight className="w-4 h-4" />
                   </span>
                 )}
@@ -126,9 +126,9 @@ const Login = () => {
 
             <div className="mt-6 text-center text-sm text-muted-foreground">
               <p>
-                Don't have an account?{' '}
-                <Link to="/register" className="text-primary hover:underline font-medium">
-                  Sign up
+                Already have an account?{' '}
+                <Link to="/" className="text-primary hover:underline font-medium">
+                  Sign in
                 </Link>
               </p>
             </div>
@@ -139,4 +139,5 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default Register;
+

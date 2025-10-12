@@ -1,42 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ArrowLeftRight, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner';
-
-const currencies = [
-  { code: 'USD', symbol: '$', flag: '🇺🇸' },
-  { code: 'EUR', symbol: '€', flag: '🇪🇺' },
-  { code: 'GBP', symbol: '£', flag: '🇬🇧' },
-  { code: 'NGN', symbol: '₦', flag: '🇳🇬' },
-  { code: 'JPY', symbol: '¥', flag: '🇯🇵' },
-  { code: 'CAD', symbol: 'C$', flag: '🇨🇦' },
-];
-
-const mockRates: Record<string, Record<string, number>> = {
-  USD: { EUR: 0.92, GBP: 0.79, NGN: 1650, JPY: 149.50, CAD: 1.36 },
-  EUR: { USD: 1.09, GBP: 0.86, NGN: 1795, JPY: 162.50, CAD: 1.48 },
-  GBP: { USD: 1.27, EUR: 1.16, NGN: 2095, JPY: 189.50, CAD: 1.72 },
-  NGN: { USD: 0.00061, EUR: 0.00056, GBP: 0.00048, JPY: 0.091, CAD: 0.00082 },
-  JPY: { USD: 0.0067, EUR: 0.0062, GBP: 0.0053, NGN: 11.03, CAD: 0.0091 },
-  CAD: { USD: 0.74, EUR: 0.68, GBP: 0.58, NGN: 1213, JPY: 110.50 },
-};
+import { useCurrencies, useConversionPreview } from '@/hooks/api/useRates';
+import { useCreateConversion } from '@/hooks/api/useConversions';
 
 const ConversionWidget = () => {
   const [fromCurrency, setFromCurrency] = useState('USD');
   const [toCurrency, setToCurrency] = useState('NGN');
   const [amount, setAmount] = useState('1000');
-  const [isConverting, setIsConverting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [rate, setRate] = useState(1650);
 
-  useEffect(() => {
-    if (fromCurrency !== toCurrency) {
-      const newRate = mockRates[fromCurrency]?.[toCurrency] || 1;
-      setRate(newRate);
-    }
-  }, [fromCurrency, toCurrency]);
+  // Fetch currencies and conversion preview
+  const { data: currencies = [], isLoading: loadingCurrencies } = useCurrencies();
+  const { data: preview, isLoading: loadingPreview } = useConversionPreview(
+    {
+      from: fromCurrency,
+      to: toCurrency,
+      amount: parseFloat(amount) || 0,
+    },
+    { enabled: !!amount && parseFloat(amount) > 0 }
+  );
+  const createConversion = useCreateConversion();
 
   const handleSwap = () => {
     setFromCurrency(toCurrency);
@@ -44,19 +30,24 @@ const ConversionWidget = () => {
   };
 
   const handleConvert = async () => {
-    setIsConverting(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsConverting(false);
-    setShowSuccess(true);
-    toast.success('Conversion successful!', {
-      description: `Converted ${amount} ${fromCurrency} to ${toCurrency}`,
+    if (!amount || parseFloat(amount) <= 0) {
+      return;
+    }
+
+    await createConversion.mutateAsync({
+      fromCurrency,
+      toCurrency,
+      amount: parseFloat(amount),
     });
+    
+    setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 3000);
   };
 
   const fromCurrencyData = currencies.find(c => c.code === fromCurrency);
   const toCurrencyData = currencies.find(c => c.code === toCurrency);
-  const convertedAmount = parseFloat(amount || '0') * rate;
+  const convertedAmount = preview?.convertedAmount || 0;
+  const rate = preview?.rate || 0;
 
   return (
     <div className="glass-card p-8">
@@ -131,25 +122,33 @@ const ConversionWidget = () => {
         <div className="p-4 bg-secondary/30 rounded-lg space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Current Rate</span>
-            <span className="font-medium tabular-nums">
-              1 {fromCurrency} = {rate.toLocaleString()} {toCurrency}
-              <span className="ml-2 inline-block w-2 h-2 bg-accent rounded-full pulse-dot" />
-            </span>
+            {loadingPreview ? (
+              <div className="h-5 w-32 bg-muted animate-pulse rounded" />
+            ) : (
+              <span className="font-medium tabular-nums">
+                1 {fromCurrency} = {rate.toLocaleString()} {toCurrency}
+                <span className="ml-2 inline-block w-2 h-2 bg-accent rounded-full pulse-dot" />
+              </span>
+            )}
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">You'll receive</span>
-            <span className="text-2xl font-bold text-accent tabular-nums">
-              {toCurrencyData?.symbol} {convertedAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
+            {loadingPreview ? (
+              <div className="h-8 w-40 bg-muted animate-pulse rounded" />
+            ) : (
+              <span className="text-2xl font-bold text-accent tabular-nums">
+                {toCurrencyData?.symbol} {convertedAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            )}
           </div>
         </div>
 
         <Button
           onClick={handleConvert}
-          disabled={isConverting || showSuccess}
+          disabled={createConversion.isPending || showSuccess || loadingCurrencies || !amount || parseFloat(amount) <= 0}
           className="w-full bg-gradient-to-r from-primary to-primary-glow hover:shadow-[0_0_40px_hsl(243,75%,59%,0.3)] transition-all duration-300"
         >
-          {isConverting ? (
+          {createConversion.isPending ? (
             <span className="flex items-center gap-2">
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               Converting...
