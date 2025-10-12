@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ArrowRight, Download, Eye, ArrowUpDown, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { ArrowRight, Download, Eye, ArrowUpDown, CheckCircle, Clock, XCircle, Loader2 } from 'lucide-react';
+import { useTransactions } from '@/hooks/api/useTransactions';
 import {
   Table,
   TableBody,
@@ -40,17 +41,8 @@ interface Transaction {
   timestamp: string;
   fullDate: string;
   status: TransactionStatus;
+  _originalId?: string;
 }
-
-const mockTransactions: Transaction[] = [
-  { id: 1, from: 'USD', to: 'NGN', amountSent: 1000, amountReceived: 1650000, rate: 1650, timestamp: '2 hours ago', fullDate: 'Oct 12, 2025 2:30 PM', status: 'completed' },
-  { id: 2, from: 'EUR', to: 'GBP', amountSent: 500, amountReceived: 430, rate: 0.86, timestamp: '5 hours ago', fullDate: 'Oct 12, 2025 11:00 AM', status: 'completed' },
-  { id: 3, from: 'GBP', to: 'USD', amountSent: 750, amountReceived: 952.5, rate: 1.27, timestamp: '1 day ago', fullDate: 'Oct 11, 2025 3:45 PM', status: 'pending' },
-  { id: 4, from: 'USD', to: 'JPY', amountSent: 2000, amountReceived: 299000, rate: 149.50, timestamp: '2 days ago', fullDate: 'Oct 10, 2025 9:20 AM', status: 'completed' },
-  { id: 5, from: 'CAD', to: 'USD', amountSent: 1500, amountReceived: 1110, rate: 0.74, timestamp: '3 days ago', fullDate: 'Oct 9, 2025 1:15 PM', status: 'failed' },
-  { id: 6, from: 'USD', to: 'EUR', amountSent: 800, amountReceived: 736, rate: 0.92, timestamp: '4 days ago', fullDate: 'Oct 8, 2025 4:30 PM', status: 'completed' },
-  { id: 7, from: 'JPY', to: 'USD', amountSent: 150000, amountReceived: 1003.34, rate: 0.0067, timestamp: '5 days ago', fullDate: 'Oct 7, 2025 10:00 AM', status: 'completed' },
-];
 
 const StatusBadge = ({ status }: { status: TransactionStatus }) => {
   const statusConfig = {
@@ -92,6 +84,14 @@ const TransactionsList = () => {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
 
+  // Fetch transactions from API
+  const { data, isLoading, isError, error } = useTransactions({
+    page: currentPage,
+    limit: itemsPerPage,
+    sortBy: sortField,
+    sortOrder: sortDirection,
+  });
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -99,17 +99,13 @@ const TransactionsList = () => {
       setSortField(field);
       setSortDirection('desc');
     }
+    // Reset to first page when sorting changes
+    setCurrentPage(1);
   };
 
-  const sortedTransactions = [...mockTransactions].sort((a, b) => {
-    const multiplier = sortDirection === 'asc' ? 1 : -1;
-    if (sortField === 'timestamp') return 0; // Would need actual dates for real sorting
-    return (a[sortField] - b[sortField]) * multiplier;
-  });
-
-  const totalPages = Math.ceil(sortedTransactions.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedTransactions = sortedTransactions.slice(startIndex, startIndex + itemsPerPage);
+  const transactions = data?.transactions || [];
+  const pagination = data?.pagination;
+  const totalPages = pagination?.totalPages || 0;
 
   const getCurrencySymbol = (currency: string) => {
     const symbols: Record<string, string> = {
@@ -118,7 +114,35 @@ const TransactionsList = () => {
     return symbols[currency] || currency;
   };
 
-  if (mockTransactions.length === 0) {
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="glass-card p-6">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          <span className="ml-3 text-muted-foreground">Loading transactions...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (isError) {
+    return (
+      <div className="glass-card p-6">
+        <div className="text-center py-12">
+          <XCircle className="w-12 h-12 mx-auto mb-4 text-destructive opacity-50" />
+          <h3 className="text-lg font-semibold mb-2">Failed to load transactions</h3>
+          <p className="text-sm text-muted-foreground">
+            {error instanceof Error ? error.message : 'Please try again later'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (transactions.length === 0) {
     return (
       <div className="glass-card p-12 text-center">
         <div className="text-muted-foreground mb-2">
@@ -198,7 +222,7 @@ const TransactionsList = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedTransactions.map((transaction) => (
+            {transactions.map((transaction) => (
               <TableRow
                 key={transaction.id}
                 className="cursor-pointer hover:scale-[1.01] transition-transform"
@@ -287,7 +311,7 @@ const TransactionsList = () => {
 
       {/* Mobile Card View */}
       <div className="md:hidden space-y-3">
-        {paginatedTransactions.map((transaction) => (
+        {transactions.map((transaction) => (
           <div
             key={transaction.id}
             className="bg-secondary/30 rounded-lg p-4 hover:bg-secondary/50 transition-colors cursor-pointer"

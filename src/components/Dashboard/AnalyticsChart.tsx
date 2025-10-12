@@ -1,16 +1,21 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
-const data = [
-  { name: 'Mon', value: 12500 },
-  { name: 'Tue', value: 18900 },
-  { name: 'Wed', value: 15200 },
-  { name: 'Thu', value: 22100 },
-  { name: 'Fri', value: 19800 },
-  { name: 'Sat', value: 25400 },
-  { name: 'Sun', value: 21600 },
-];
+import { useConversionTimelineDays } from '@/hooks/api/useAnalytics';
 
 const AnalyticsChart = () => {
+  const { data: timelineData, isLoading, isError } = useConversionTimelineDays(7);
+
+  // Transform API data for chart
+  const chartData = timelineData?.timeline.map((item) => {
+    const date = new Date(item.timestamp);
+    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+    
+    return {
+      name: dayName,
+      value: item.totalAmount,
+      count: item.conversionCount,
+    };
+  }) || [];
+
   return (
     <div className="glass-card p-6">
       <div className="mb-6">
@@ -18,8 +23,21 @@ const AnalyticsChart = () => {
         <p className="text-sm text-muted-foreground">Last 7 days</p>
       </div>
       
-      <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={data}>
+      {isLoading ? (
+        <div className="h-[300px] flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+        </div>
+      ) : isError ? (
+        <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+          Failed to load analytics data
+        </div>
+      ) : chartData.length === 0 ? (
+        <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+          No data available for the selected period
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={300}>
+          <AreaChart data={chartData}>
           <defs>
             <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="hsl(158, 64%, 52%)" stopOpacity={0.3}/>
@@ -47,16 +65,17 @@ const AnalyticsChart = () => {
             }}
             labelStyle={{ color: 'hsl(var(--foreground))' }}
           />
-          <Area
-            type="monotone"
-            dataKey="value"
-            stroke="hsl(var(--accent))"
-            strokeWidth={2}
-            fillOpacity={1}
-            fill="url(#colorValue)"
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+            <Area
+              type="monotone"
+              dataKey="value"
+              stroke="hsl(var(--accent))"
+              strokeWidth={2}
+              fillOpacity={1}
+              fill="url(#colorValue)"
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      )}
     </div>
   );
 };
